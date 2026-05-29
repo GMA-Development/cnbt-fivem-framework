@@ -8,6 +8,10 @@ return {
     -- Logging verbosity: trace | debug | info | warn | error
     logLevel = 'info',
 
+    -- Loads server-side debug commands (cnbtinfo / cnbtmoney / cnbtsave).
+    -- Set to false in production — when off, zero commands are registered.
+    debug = true,
+
     -- Default locale (reserved for the i18n component added later).
     locale = 'it',
 
@@ -20,6 +24,9 @@ return {
 
     player = {
         maxCharacters = 5,
+
+        -- Default ped model used until a character appearance system exists.
+        defaultModel = 'mp_m_freemode_01',
 
         -- Fallback spawn (Legion Square) used for brand new characters.
         defaultSpawn = { x = 195.17, y = -933.77, z = 30.69, heading = 144.0 },

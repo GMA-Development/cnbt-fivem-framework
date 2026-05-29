@@ -16,24 +16,54 @@ local callback = require 'client.modules.callback.callback'
 require 'client.modules.state.state'
 require 'client.api.exports'
 
+local config = require 'config.config'
 local logger = require 'shared.logger'
 
---- Teleports the local ped to a saved position and ends the loading screen.
+local function endLoadingScreen()
+    ShutdownLoadingScreen()
+    ShutdownLoadingScreenNui()
+end
+
+--- Spawns the local ped at a saved position. Uses spawnmanager (present on
+--- most servers) for robust model/ped setup, with a manual fallback.
 local function spawnAt(position)
+    local modelHash = GetHashKey(config.player.defaultModel)
+
+    if GetResourceState('spawnmanager') == 'started' then
+        exports.spawnmanager:spawnPlayer({
+            x = position.x,
+            y = position.y,
+            z = position.z,
+            heading = position.heading or 0.0,
+            model = modelHash,
+            skipFade = false,
+        }, endLoadingScreen)
+        return
+    end
+
+    -- Fallback: load the model and place the existing ped manually.
+    RequestModel(modelHash)
+    local timeout = GetGameTimer() + 10000
+    while not HasModelLoaded(modelHash) and GetGameTimer() < timeout do Wait(0) end
+    SetPlayerModel(PlayerId(), modelHash)
+    SetModelAsNoLongerNeeded(modelHash)
+
     local ped = PlayerPedId()
     RequestCollisionAtCoord(position.x, position.y, position.z)
     SetEntityCoords(ped, position.x, position.y, position.z, false, false, false, false)
     SetEntityHeading(ped, position.heading or 0.0)
     FreezeEntityPosition(ped, false)
-
-    ShutdownLoadingScreen()
-    ShutdownLoadingScreenNui()
+    endLoadingScreen()
 end
 
 -- Tell the server we're ready once the session is actually live.
 AddEventHandler('onClientResourceStart', function(res)
     if res ~= GetCurrentResourceName() then return end
     CreateThread(function()
+        -- We own spawning, so stop spawnmanager from auto-spawning.
+        if GetResourceState('spawnmanager') == 'started' then
+            exports.spawnmanager:setAutoSpawn(false)
+        end
         while not NetworkIsSessionStarted() do Wait(200) end
         TriggerServerEvent('cnbt:server:playerReady')
     end)

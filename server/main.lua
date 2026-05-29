@@ -24,4 +24,9 @@ require 'server.modules.player.manager'
 -- Public API
 require 'server.api.exports'
 
+-- Optional dev tooling (registers nothing in production).
+if require('config.config').debug then
+    require 'server.modules.debug.commands'
+end
+
 logger.info(('framework v%s avviato (server)'):format(CNBT.version))
