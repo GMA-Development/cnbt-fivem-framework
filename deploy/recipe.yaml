@@ -1,0 +1,126 @@
+# ==========================================================
+#  CNBT Framework — txAdmin deploy recipe
+#  Engine 3. Deploya: base cfx-server-data + oxmysql + cnbt,
+#  configura il database e scrive un server.cfg pronto all'uso.
+#
+#  Uso: txAdmin -> Deployment Type -> "Custom Template" e incolla
+#  questo file. (Oppure "Remote URL Template" con il raw di questo file.)
+# ==========================================================
+
+$engine: 3
+$onesync: "on"
+
+name: CNBT Framework
+version: 0.1.0
+author: CNBT
+description: >-
+  Deploy turnkey del framework RP leggero CNBT
+  (cfx base + oxmysql + cnbt + setup database + server.cfg).
+
+tasks:
+  # ---------- 1) Base cfx-server-data ----------
+  - action: download_github
+    src: https://github.com/citizenfx/cfx-server-data
+    dest: ./tmp/cfx-server-data
+  - action: move_path
+    src: ./tmp/cfx-server-data/resources
+    dest: ./resources
+  - action: remove_path
+    path: ./tmp/cfx-server-data
+
+  # ---------- 2) oxmysql (build di release) ----------
+  - action: download_file
+    url: https://github.com/overextended/oxmysql/releases/latest/download/oxmysql.zip
+    path: ./tmp/oxmysql.zip
+  - action: unzip
+    src: ./tmp/oxmysql.zip
+    dest: ./resources/[standalone]
+  - action: remove_path
+    path: ./tmp/oxmysql.zip
+
+  # ---------- 3) CNBT framework ----------
+  # NOTA: la cartella DEVE chiamarsi 'cnbt' per avere exports.cnbt.
+  # Se il repo è PRIVATO, rimuovi questo task e clona cnbt a mano dopo il deploy.
+  - action: download_github
+    src: https://github.com/gma-development/cnbt-fivem-framework
+    ref: claude/wonderful-pasteur-XtZMl
+    dest: ./resources/[cnbt]/cnbt
+
+  # ---------- 4) Database (schema inline) ----------
+  - action: connect_database
+  - action: query_database
+    query: |
+      CREATE TABLE IF NOT EXISTS `users` (
+        `id`        INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        `license`   VARCHAR(64)  NOT NULL,
+        `createdAt` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `users_license` (`license`)
+      ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+  - action: query_database
+    query: |
+      CREATE TABLE IF NOT EXISTS `characters` (
+        `id`        INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        `userId`    INT UNSIGNED NOT NULL,
+        `citizenid` VARCHAR(16)  NOT NULL,
+        `firstName` VARCHAR(32)  NOT NULL,
+        `lastName`  VARCHAR(32)  NOT NULL,
+        `dob`       VARCHAR(16)           DEFAULT NULL,
+        `gender`    TINYINT               DEFAULT 0,
+        `money`     LONGTEXT,
+        `job`       LONGTEXT,
+        `position`  LONGTEXT,
+        `metadata`  LONGTEXT,
+        `createdAt` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `updatedAt` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `characters_citizenid` (`citizenid`),
+        KEY `characters_userId` (`userId`),
+        CONSTRAINT `characters_user_fk`
+          FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE
+      ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+  # ---------- 5) server.cfg ----------
+  - action: write_file
+    file: ./server.cfg
+    data: |
+      # ======================================================
+      #  CNBT Framework — server.cfg (generato dalla recipe)
+      # ======================================================
+
+      # --- Endpoint di rete (gestiti da txAdmin) ---
+      {{serverEndpoints}}
+
+      # --- Risorse di sistema (cfx-server-data) ---
+      ensure mapmanager
+      ensure chat
+      ensure spawnmanager
+      ensure sessionmanager
+      ensure hardcap
+      ensure rconlog
+      ensure scoreboard
+      ensure playernames
+      # spawnmanager è richiesto: CNBT lo usa per lo spawn del player.
+      # basic-gamemode / fivem-map-* NON sono avviati di proposito:
+      # allo spawn ci pensa CNBT (niente conflitti).
+
+      # --- Database ---
+      set mysql_connection_string "{{dbConnectionString}}"
+      ensure oxmysql
+
+      # --- CNBT Framework ---
+      ensure cnbt
+
+      # --- Impostazioni server ---
+      sv_scriptHookAllowed 0
+      set onesync on
+      sv_maxclients {{maxClients}}
+      sv_endpointprivacy true
+      sv_hostname "CNBT RP Server"
+      sets tags "roleplay, cnbt"
+      locale "it-IT"
+
+      # --- Admin master (gestito da txAdmin) ---
+      {{addPrincipalsMaster}}
+
+      sv_licenseKey "{{svLicense}}"
