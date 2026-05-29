@@ -1,0 +1,13 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+
+# Local overrides (never commit secrets / per-server config)
+config/config.local.lua
+.env
